@@ -1,0 +1,9 @@
+{
+  "name": "คำนวณขนาดยา Warfarin",
+  "short_name": "Warfarin Dose",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fce4ec",
+  "theme_color": "#ec407a",
+  "icons": []
+}

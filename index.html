@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>คำนวณขนาดยา Warfarin</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #fce4ec;
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      background: white;
+      max-width: 650px;
+      margin: auto;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    label, select, input, button {
+      display: block;
+      margin: 10px 0;
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #ec407a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #result {
+      background: #fce4ec;
+      border-left: 5px solid #ec407a;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .circles {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+    }
+    .circle, .half-circle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .circle.blue { background: #42a5f5; }
+    .circle.pink { background: #ec407a; }
+    .half-circle.blue {
+      background: linear-gradient(to right, #42a5f5 50%, #fff 50%);
+    }
+    .half-circle.pink {
+      background: linear-gradient(to right, #ec407a 50%, #fff 50%);
+    }
+    table {
+      width: 100%;
+      margin-top: 10px;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 6px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>คำนวณขนาดยา Warfarin</h2>
+
+    <label for="inr">ค่า INR:</label>
+    <input type="number" id="inr" step="0.1">
+
+    <label for="bleeding">มีเลือดออกหรือไม่:</label>
+    <select id="bleeding">
+      <option value="no">ไม่มี</option>
+      <option value="yes">มี</option>
+    </select>
+
+    <label for="weeklyDose">ขนาดยาเฉลี่ยต่อสัปดาห์ (mg/สัปดาห์):</label>
+    <input type="number" id="weeklyDose" step="0.1">
+
+    <button onclick="adjustDose()">คำนวณ</button>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
+
+    function calculateTablets(dose) {
+      let options = [];
+      for (let i = 0; i <= 4; i++) {
+        for (let j = 0; j <= 4; j++) {
+          let total = i * 3 + j * 5;
+          let diff = Math.abs(dose - total) / dose * 100;
+          if (diff <= 50) {
+            options.push({ tabs3: i, tabs5: j, total, diff });
+          }
+        }
+      }
+      options.sort((a, b) => a.diff - b.diff);
+      return options[0] || null;
+    }
+
+    function getAdjustment(inr, bleeding) {
+      if (bleeding === "yes") {
+        return { percent: 0, text: "ให้ Vitamin K₁ 10 mg IV + FFP และ repeat ทุก 12 ชม.", override: true };
+      }
+      if (inr < 1.5) return { percent: 0.15, text: "เพิ่มขนาดยา 10–20%" };
+      if (inr < 2.0) return { percent: 0.075, text: "เพิ่มขนาดยา 5–10%" };
+      if (inr <= 3.0) return { percent: 0, text: "ให้ขนาดยาเท่าเดิม" };
+      if (inr <= 3.9) return { percent: -0.075, text: "ลดขนาดยา 5–10%" };
+      if (inr <= 4.9) return { percent: -0.10, text: "หยุดยา 1 วัน แล้วลดขนาดยา 10%" };
+      if (inr <= 8.9) return { percent: 0, text: "หยุดยา 1–2 วัน และให้ Vitamin K₁ 1 mg oral", override: true };
+      return { percent: 0, text: "ให้ Vitamin K₁ 5–10 mg oral", override: true };
+    }
+
+    function adjustDose() {
+      const inr = parseFloat(document.getElementById("inr").value);
+      const bleeding = document.getElementById("bleeding").value;
+      const weekly = parseFloat(document.getElementById("weeklyDose").value);
+
+      const resultDiv = document.getElementById("result");
+      if (isNaN(inr) || isNaN(weekly)) {
+        alert("กรุณากรอกข้อมูลให้ครบ");
+        return;
+      }
+
+      const adj = getAdjustment(inr, bleeding);
+      if (adj.override) {
+        resultDiv.innerHTML = `<strong>คำแนะนำ:</strong> ${adj.text}`;
+        return;
+      }
+
+      const newWeekly = weekly * (1 + adj.percent);
+      const daily = newWeekly / 7;
+      let html = `<strong>คำแนะนำ:</strong> ${adj.text}<br><strong>ขนาดใหม่:</strong> ${newWeekly.toFixed(2)} mg/สัปดาห์<br><br>`;
+      html += `<table><tr><th>วัน</th><th>ขนาดยา (mg)</th><th>เม็ด</th></tr>`;
+      for (let i = 0; i < 7; i++) {
+        const t = calculateTablets(daily);
+        const pillHTML = `
+          <div class="circles">
+            ${'●'.repeat(t.tabs3).replace(/●/g, '<span class="circle blue"></span>')}
+            ${'●'.repeat(t.tabs5).replace(/●/g, '<span class="circle pink"></span>')}
+          </div>
+        `;
+        html += `<tr><td>${days[i]}</td><td>${t.total} mg</td><td>${pillHTML}</td></tr>`;
+      }
+      html += `</table>`;
+      resultDiv.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
