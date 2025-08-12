@@ -1,162 +1,128 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>คำนวณขนาดยา Warfarin</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>คำนวณและกระจายขนาดยา Warfarin</title>
   <style>
     body {
-      font-family: sans-serif;
-      background: #fce4ec;
+      font-family: "Kanit", sans-serif;
+      background: #fff8f0;
       padding: 20px;
-      color: #333;
     }
-    .container {
-      background: white;
-      max-width: 650px;
-      margin: auto;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    h1 {
+      color: #b22222;
+      text-align: center;
     }
-    label, select, input, button {
-      display: block;
-      margin: 10px 0;
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
+    label {
+      font-weight: bold;
     }
-    button {
-      background-color: #ec407a;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    #result {
-      background: #fce4ec;
-      border-left: 5px solid #ec407a;
-      padding: 15px;
-      margin-top: 20px;
-    }
-    .circles {
-      display: flex;
-      justify-content: center;
-      gap: 5px;
-    }
-    .circle, .half-circle {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .circle.blue { background: #42a5f5; }
-    .circle.pink { background: #ec407a; }
-    .half-circle.blue {
-      background: linear-gradient(to right, #42a5f5 50%, #fff 50%);
-    }
-    .half-circle.pink {
-      background: linear-gradient(to right, #ec407a 50%, #fff 50%);
+    input, button {
+      padding: 6px;
+      margin: 5px 0;
+      font-size: 1em;
     }
     table {
       width: 100%;
-      margin-top: 10px;
       border-collapse: collapse;
+      margin-top: 15px;
     }
     th, td {
-      padding: 6px;
-      border: 1px solid #ccc;
+      border: 1px solid #999;
+      padding: 8px;
       text-align: center;
+    }
+    th {
+      background: #ffe4e1;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 10px;
+      background: #faf0e6;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>คำนวณขนาดยา Warfarin</h2>
 
-    <label for="inr">ค่า INR:</label>
-    <input type="number" id="inr" step="0.1">
+  <h1>เครื่องคำนวณและกระจายขนาดยา Warfarin</h1>
 
-    <label for="bleeding">มีเลือดออกหรือไม่:</label>
-    <select id="bleeding">
-      <option value="no">ไม่มี</option>
-      <option value="yes">มี</option>
-    </select>
+  <label for="weeklyDose">ขนาดยาต่อสัปดาห์ (mg):</label>
+  <input type="number" id="weeklyDose" step="0.5" />
 
-    <label for="weeklyDose">ขนาดยาเฉลี่ยต่อสัปดาห์ (mg/สัปดาห์):</label>
-    <input type="number" id="weeklyDose" step="0.1">
+  <br/>
+  <button onclick="calculateBalanced()">คำนวณ</button>
 
-    <button onclick="adjustDose()">คำนวณ</button>
-
-    <div id="result"></div>
-  </div>
+  <div class="result" id="result"></div>
 
   <script>
-    const days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
+    const dayNames = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 
-    function calculateTablets(dose) {
-      let options = [];
-      for (let i = 0; i <= 4; i++) {
-        for (let j = 0; j <= 4; j++) {
-          let total = i * 3 + j * 5;
-          let diff = Math.abs(dose - total) / dose * 100;
-          if (diff <= 50) {
-            options.push({ tabs3: i, tabs5: j, total, diff });
+    function calculateBalanced() {
+      let weeklyDose = parseFloat(document.getElementById('weeklyDose').value);
+      if (isNaN(weeklyDose) || weeklyDose <= 0) {
+        alert('กรุณากรอกขนาดยาต่อสัปดาห์ให้ถูกต้อง');
+        return;
+      }
+
+      let dailyTarget = weeklyDose / 7;
+      let days = [];
+
+      // เริ่มกระจายโดยใกล้เคียง dailyTarget มากที่สุด
+      for (let i = 0; i < 7; i++) {
+        let bestCombo = null;
+        let minDiff = Infinity;
+
+        // ลองทุกการผสมเม็ด 2 และ 3 mg
+        for (let n3 = 0; n3 <= 3; n3++) { 
+          for (let n2 = 0; n2 <= 3; n2++) { 
+            let total = n3 * 3 + n2 * 2;
+            let diff = Math.abs(total - dailyTarget);
+            if (total > 0 && diff < minDiff) {
+              minDiff = diff;
+              bestCombo = { n3, n2, total };
+            }
           }
         }
-      }
-      options.sort((a, b) => a.diff - b.diff);
-      return options[0] || null;
-    }
-
-    function getAdjustment(inr, bleeding) {
-      if (bleeding === "yes") {
-        return { percent: 0, text: "ให้ Vitamin K₁ 10 mg IV + FFP และ repeat ทุก 12 ชม.", override: true };
-      }
-      if (inr < 1.5) return { percent: 0.15, text: "เพิ่มขนาดยา 10–20%" };
-      if (inr < 2.0) return { percent: 0.075, text: "เพิ่มขนาดยา 5–10%" };
-      if (inr <= 3.0) return { percent: 0, text: "ให้ขนาดยาเท่าเดิม" };
-      if (inr <= 3.9) return { percent: -0.075, text: "ลดขนาดยา 5–10%" };
-      if (inr <= 4.9) return { percent: -0.10, text: "หยุดยา 1 วัน แล้วลดขนาดยา 10%" };
-      if (inr <= 8.9) return { percent: 0, text: "หยุดยา 1–2 วัน และให้ Vitamin K₁ 1 mg oral", override: true };
-      return { percent: 0, text: "ให้ Vitamin K₁ 5–10 mg oral", override: true };
-    }
-
-    function adjustDose() {
-      const inr = parseFloat(document.getElementById("inr").value);
-      const bleeding = document.getElementById("bleeding").value;
-      const weekly = parseFloat(document.getElementById("weeklyDose").value);
-
-      const resultDiv = document.getElementById("result");
-      if (isNaN(inr) || isNaN(weekly)) {
-        alert("กรุณากรอกข้อมูลให้ครบ");
-        return;
+        days.push(bestCombo);
       }
 
-      const adj = getAdjustment(inr, bleeding);
-      if (adj.override) {
-        resultDiv.innerHTML = `<strong>คำแนะนำ:</strong> ${adj.text}`;
-        return;
+      // ปรับให้รวมใกล้ weeklyDose
+      let totalMg = days.reduce((sum, d) => sum + d.total, 0);
+      while (totalMg !== weeklyDose) {
+        if (totalMg < weeklyDose) {
+          // เพิ่มวันใดวันหนึ่ง +2 หรือ +3 mg
+          let day = days.find(d => d.n3 + d.n2 < 3);
+          if (day) {
+            if (weeklyDose - totalMg >= 3) { day.n3++; totalMg += 3; }
+            else { day.n2++; totalMg += 2; }
+          } else break;
+        } else {
+          // ลดวันใดวันหนึ่ง -2 หรือ -3 mg
+          let day = days.find(d => d.total > dailyTarget);
+          if (day) {
+            if (totalMg - weeklyDose >= 3 && day.n3 > 0) { day.n3--; totalMg -= 3; }
+            else if (day.n2 > 0) { day.n2--; totalMg -= 2; }
+            else break;
+          } else break;
+        }
       }
 
-      const newWeekly = weekly * (1 + adj.percent);
-      const daily = newWeekly / 7;
-      let html = `<strong>คำแนะนำ:</strong> ${adj.text}<br><strong>ขนาดใหม่:</strong> ${newWeekly.toFixed(2)} mg/สัปดาห์<br><br>`;
-      html += `<table><tr><th>วัน</th><th>ขนาดยา (mg)</th><th>เม็ด</th></tr>`;
-      for (let i = 0; i < 7; i++) {
-        const t = calculateTablets(daily);
-        const pillHTML = `
-          <div class="circles">
-            ${'●'.repeat(t.tabs3).replace(/●/g, '<span class="circle blue"></span>')}
-            ${'●'.repeat(t.tabs5).replace(/●/g, '<span class="circle pink"></span>')}
-          </div>
-        `;
-        html += `<tr><td>${days[i]}</td><td>${t.total} mg</td><td>${pillHTML}</td></tr>`;
-      }
-      html += `</table>`;
-      resultDiv.innerHTML = html;
+      // แสดงผล
+      let html = `<p>ขนาดยารวมต่อสัปดาห์: <b>${weeklyDose} mg</b> (เฉลี่ยวันละ ${dailyTarget.toFixed(2)} mg)</p>`;
+      html += `<table><tr><th>วัน</th><th>เม็ด 3 mg</th><th>เม็ด 2 mg</th><th>รวม (mg)</th></tr>`;
+      days.forEach((d, i) => {
+        html += `<tr>
+          <td>${dayNames[i]}</td>
+          <td>${d.n3}</td>
+          <td>${d.n2}</td>
+          <td>${d.total}</td>
+        </tr>`;
+      });
+      html += `</table><p>รวมจริง: <b>${totalMg} mg</b></p>`;
+      document.getElementById('result').innerHTML = html;
     }
   </script>
+
 </body>
 </html>
