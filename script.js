@@ -1,85 +1,87 @@
+<script>
+  const days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
 
-const days = ["จันทร์", "อังคาร", "พุธ", "พฤหัส", "ศุกร์", "เสาร์", "อาทิตย์"];
-
-function getRecommendation(inr, bleeding) {
-  if (bleeding === "yes") {
-    return { percent: 0, text: "ให้ Vitamin K₁ 10 mg IV + FFP และ repeat ทุก 12 ชม.", override: true };
-  }
-  if (inr < 1.5) return { percent: 0.15, text: "เพิ่มขนาดยา 10–20%" };
-  if (inr < 2.0) return { percent: 0.075, text: "เพิ่มขนาดยา 5–10%" };
-  if (inr <= 3.0) return { percent: 0, text: "ให้ขนาดยาเท่าเดิม" };
-  if (inr <= 3.9) return { percent: -0.075, text: "ลดขนาดยา 5–10%" };
-  if (inr <= 4.9) return { percent: -0.10, text: "หยุดยา 1 วัน แล้วลดขนาดยา 10%" };
-  if (inr <= 8.9) return { percent: 0, text: "หยุดยา 1–2 วัน และให้ Vitamin K₁ 1 mg oral", override: true };
-  return { percent: 0, text: "ให้ Vitamin K₁ 5–10 mg oral", override: true };
-}
-
-function findTabletCombo(target) {
-  const options = [];
-  for (let i = 0; i <= 10; i++) {
-    for (let j = 0; j <= 10; j++) {
-      const total = i * 3 + j * 5;
-      const diff = Math.abs(total - target) / target;
-      if (total > 0 && diff <= 0.5) {
-        options.push({ total, tabs3: i, tabs5: j, diff });
+  function calculateTablets(dose) {
+    let best = null;
+    let minDiff = Infinity;
+    for (let i = 0; i <= 4; i++) { // i = จำนวนเม็ด 3 mg
+      for (let j = 0; j <= 4; j++) { // j = จำนวนเม็ด 2 mg
+        let total = i * 3 + j * 2;
+        let diff = Math.abs(dose - total);
+        if (diff < minDiff) {
+          minDiff = diff;
+          best = { tabs3: i, tabs2: j, total };
+        }
       }
     }
-  }
-  options.sort((a, b) => a.diff - b.diff);
-  return options[0];
-}
-
-function renderCircles(tabs3, tabs5) {
-  let html = "";
-  for (let i = 0; i < Math.floor(tabs3); i++) html += '<span class="circle mg3"></span>';
-  if (tabs3 % 1 >= 0.5) html += '<span class="half-circle mg3"></span>';
-  for (let i = 0; i < Math.floor(tabs5); i++) html += '<span class="circle mg5"></span>';
-  if (tabs5 % 1 >= 0.5) html += '<span class="half-circle mg5"></span>';
-  return html;
-}
-
-function calculate() {
-  const inr = parseFloat(document.getElementById("inr").value);
-  const bleeding = document.getElementById("bleeding").value;
-  const avg = parseFloat(document.getElementById("avgDose").value);
-
-  if (isNaN(inr) || isNaN(avg)) {
-    alert("กรุณากรอกข้อมูลให้ครบ");
-    return;
+    return best;
   }
 
-  const rec = getRecommendation(inr, bleeding);
-  const result = document.getElementById("result");
-  if (rec.override) {
-    result.innerHTML = `<strong>คำแนะนำ:</strong> ${rec.text}`;
-    return;
+  function distributeDoses(totalWeekly) {
+    let targetDaily = totalWeekly / 7;
+    let plan = [];
+    let withBoth = false;
+
+    for (let i = 0; i < 7; i++) {
+      let t = calculateTablets(targetDaily);
+      plan.push(t);
+      if (t.tabs3 > 0 && t.tabs2 > 0) withBoth = true;
+    }
+
+    // ถ้าไม่มีวันไหนมีทั้งเม็ด 2 และ 3 ให้ปรับวันแรกให้มี
+    if (!withBoth) {
+      let t = calculateTablets(Math.round(targetDaily) + 0.5);
+      if (t.tabs3 > 0 && t.tabs2 > 0) plan[0] = t;
+    }
+    return plan;
   }
 
-  const newAvg = avg * (1 + rec.percent);
-  const totalWeek = newAvg * 7;
-
-  let html = `
-    <strong>คำแนะนำ:</strong> ${rec.text}<br>
-    <strong>ขนาดยาต่อสัปดาห์:</strong> ${totalWeek.toFixed(2)} mg<br>
-    <strong>ขนาดยาเฉลี่ยต่อวัน:</strong> ${newAvg.toFixed(2)} mg<br><br>
-    <table>
-      <tr>
-        <th>วัน</th><th>ขนาด (mg)</th><th>3 mg</th><th>5 mg</th><th>รวมเม็ด</th><th>แสดงผล</th>
-      </tr>`;
-
-  for (let i = 0; i < 7; i++) {
-    const combo = findTabletCombo(newAvg);
-    const visual = renderCircles(combo.tabs3, combo.tabs5);
-    html += `
-      <tr>
-        <td>${days[i]}</td>
-        <td>${combo.total}</td>
-        <td>${combo.tabs3}</td>
-        <td>${combo.tabs5}</td>
-        <td>${combo.tabs3 + combo.tabs5}</td>
-        <td>${visual}</td>
-      </tr>`;
+  function getAdjustment(inr, bleeding) {
+    if (bleeding === "yes") {
+      return { percent: 0, text: "ให้ Vitamin K₁ 10 mg IV + FFP และ repeat ทุก 12 ชม.", override: true };
+    }
+    if (inr < 1.5) return { percent: 0.15, text: "เพิ่มขนาดยา 10–20%" };
+    if (inr < 2.0) return { percent: 0.075, text: "เพิ่มขนาดยา 5–10%" };
+    if (inr <= 3.0) return { percent: 0, text: "ให้ขนาดยาเท่าเดิม" };
+    if (inr <= 3.9) return { percent: -0.075, text: "ลดขนาดยา 5–10%" };
+    if (inr <= 4.9) return { percent: -0.10, text: "หยุดยา 1 วัน แล้วลดขนาดยา 10%" };
+    if (inr <= 8.9) return { percent: 0, text: "หยุดยา 1–2 วัน และให้ Vitamin K₁ 1 mg oral", override: true };
+    return { percent: 0, text: "ให้ Vitamin K₁ 5–10 mg oral", override: true };
   }
-  html += "</table>";
-  result.innerHTML = html;
-}
+
+  function adjustDose() {
+    const inr = parseFloat(document.getElementById("inr").value);
+    const bleeding = document.getElementById("bleeding").value;
+    const weekly = parseFloat(document.getElementById("weeklyDose").value);
+
+    const resultDiv = document.getElementById("result");
+    if (isNaN(inr) || isNaN(weekly)) {
+      alert("กรุณากรอกข้อมูลให้ครบ");
+      return;
+    }
+
+    const adj = getAdjustment(inr, bleeding);
+    if (adj.override) {
+      resultDiv.innerHTML = `<strong>คำแนะนำ:</strong> ${adj.text}`;
+      return;
+    }
+
+    const newWeekly = weekly * (1 + adj.percent);
+    const plan = distributeDoses(newWeekly);
+
+    let html = `<strong>คำแนะนำ:</strong> ${adj.text}<br><strong>ขนาดใหม่:</strong> ${newWeekly.toFixed(2)} mg/สัปดาห์<br><br>`;
+    html += `<table><tr><th>วัน</th><th>ขนาดยา (mg)</th><th>เม็ด</th></tr>`;
+    for (let i = 0; i < 7; i++) {
+      const t = plan[i];
+      const pillHTML = `
+        <div class="circles">
+          ${'●'.repeat(t.tabs3).replace(/●/g, '<span class="circle blue"></span>')}
+          ${'●'.repeat(t.tabs2).replace(/●/g, '<span class="circle pink"></span>')}
+        </div>
+      `;
+      html += `<tr><td>${days[i]}</td><td>${t.total} mg</td><td>${pillHTML}</td></tr>`;
+    }
+    html += `</table>`;
+    resultDiv.innerHTML = html;
+  }
+</script>
